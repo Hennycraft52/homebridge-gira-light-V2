@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "lights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the Gira light"
+          },
+          "id": {
+            "type": "string",
+            "description": "ID of the Gira light"
+          }
+        },
+        "required": ["name", "id"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["lights"],
+  "additionalProperties": false
+}
