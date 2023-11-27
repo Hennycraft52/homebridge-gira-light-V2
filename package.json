@@ -2,7 +2,7 @@
   "name": "homebridge-gira-light",
   "version": "1.0.0",
   "description": "Homebridge plugin for controlling Gira lights",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "clean": "rimraf ./dist",
     "build": "rimraf ./dist && tsc",
