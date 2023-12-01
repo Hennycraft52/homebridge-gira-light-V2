@@ -1,99 +1,61 @@
-import {
-  AccessoryConfig,
-  AccessoryPlugin,
-  API,
-  CharacteristicEventTypes,
-  CharacteristicGetCallback,
-  CharacteristicSetCallback,
-  CharacteristicValue,
-  HAP,
-  Logging,
-  Service
-} from "homebridge";
-import axios from "axios";
+const { toggleLamp, getLampStatus } = require('./lib/toggle');
 
-class GiraLightAccessory implements AccessoryPlugin {
+module.exports = function (homebridge) {
+    const { Service, Characteristic } = homebridge.hap;
 
-  private readonly log: Logging;
-  private readonly name: string;
-  private readonly id: string;
-  private lightOn = false;
+    class LampAccessory {
+        constructor(log, config) {
+            this.log = log;
+            this.config = config;
 
-  private readonly lightService: Service;
-  private readonly informationService: Service;
+            setInterval(() => {
+                const { ip, lampId, username, password } = this.config;
 
-  constructor(log: Logging, config: AccessoryConfig, api: API) {
-    this.log = log;
-    this.name = config.name;
-    this.id = config.id;
+                getLampStatus(ip, lampId, username, password)
+                    .then(status => {
+                        console.log(`Lamp status: ${status}`);
+                    })
+                    .catch(error => {
+                        console.error(error);
+                    });
+            }, 10000);
 
-    this.lightService = new api.hap.Service.Lightbulb(this.name);
-    this.lightService.getCharacteristic(api.hap.Characteristic.On)
-      .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-        this.refreshState();
-        callback(undefined, this.lightOn);
-      })
-      .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
-        this.toggleLight(value as boolean, callback);
-      });
+            this.service = new Service.Lightbulb(config.name);
 
-    this.informationService = new api.hap.Service.AccessoryInformation()
-      .setCharacteristic(api.hap.Characteristic.Manufacturer, "Gira")
-      .setCharacteristic(api.hap.Characteristic.Model, "Light Switch");
+            this.service
+                .getCharacteristic(Characteristic.On)
+                .on('get', this.getOn.bind(this))
+                .on('set', this.setOn.bind(this));
+        }
 
-    log.info("Gira Light finished initializing!");
-  }
+        getServices() {
+            return [this.service];
+        }
 
-  identify(): void {
-    this.log("Identify!");
-  }
+        getOn(callback) {
+            const { ip, lampId, username, password } = this.config;
 
-  getServices(): Service[] {
-    return [
-      this.informationService,
-      this.lightService,
-    ];
-  }
+            getLampStatus(ip, lampId, username, password)
+                .then(status => {
+                    callback(null, status === 'on');
+                })
+                .catch(error => {
+                    callback(error);
+                });
+        }
 
-  refreshState(): void {
-    const getEndpoint = `http://your-gira-server/endpoints/call?key=${this.id}&method=get`;
-    
-    axios.get(getEndpoint)
-      .then(response => {
-        this.log.debug('Refresh light state response:', response.data);
-        const currentState = this.parseResponseToState(response.data);
-        this.lightService.getCharacteristic(this.hap.Characteristic.On).updateValue(currentState);
-      })
-      .catch(error => {
-        this.log.error('Error refreshing light state:', error.message);
-      });
-  }
+        setOn(value, callback) {
+            const { ip, lampId, username, password } = this.config;
 
-  toggleLight(on: boolean, callback: CharacteristicSetCallback): void {
-    const toggleEndpoint = `http://your-gira-server/endpoints/call?key=${this.id}&method=toggle&value=${on ? 1 : 0}`;
-    
-    axios.get(toggleEndpoint)
-      .then(response => {
-        this.log.debug('Toggle light response:', response.data);
-        this.refreshState();
-        callback(null);
-      })
-      .catch(error => {
-        this.log.error('Error toggling light:', error.message);
-        callback(error);
-      });
-  }
-
-  parseResponseToState(response: any): boolean {
-    try {
-      const parsedResponse = JSON.parse(response);
-      return parsedResponse.status === 'on';
-    } catch (error) {
-      return false;
+            toggleLamp(ip, lampId, username, password)
+                .then(() => {
+                    callback(null);
+                })
+                .catch(error => {
+                    callback(error);
+                });
+        }
     }
-  }
-}
 
-export = (api: API) => {
-  api.registerAccessory("GiraLightAccessory", GiraLightAccessory);
+    homebridge.registerAccessory('homebridge-lamp', 'Lamp', LampAccessory);
 };
