@@ -57,5 +57,5 @@ module.exports = function (homebridge) {
         }
     }
 
-    homebridge.registerAccessory('homebridge-lamp', 'Lamp', LampAccessory);
+    homebridge.registerAccessory('homebridge-lamp', 'Lamp', LampAccessory2);
 };
