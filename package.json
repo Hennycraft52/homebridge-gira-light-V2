@@ -1,6 +1,6 @@
 {
   "name": "homebridge-gira-light",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Homebridge plugin for controlling Gira lights",
   "main": "index.js",
   "scripts": {
