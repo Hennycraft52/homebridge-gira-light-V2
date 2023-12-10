@@ -1,61 +1,95 @@
-const { toggleLamp, getLampStatus } = require('./lib/toggle');
+const { toggleLight, getLightStatus } = require('./lib/light');
 
-module.exports = function (homebridge) {
-    const { Service, Characteristic } = homebridge.hap;
+module.exports = (homebridge) => {
+    const Accessory = homebridge.hap.Accessory;
+    const Service = homebridge.hap.Service;
+    const Characteristic = homebridge.hap.Characteristic;
 
-    class LampAccessory {
+    class LightAccessory {
         constructor(log, config) {
             this.log = log;
-            this.config = config;
+            this.name = config.name;
+            this.ip = config.ip;
+            this.lightId = config.lightId;
+            this.username = config.username;
+            this.password = config.password;
 
-            setInterval(() => {
-                const { ip, lampId, username, password } = this.config;
-
-                getLampStatus(ip, lampId, username, password)
-                    .then(status => {
-                        console.log(`Lamp status: ${status}`);
-                    })
-                    .catch(error => {
-                        console.error(error);
-                    });
-            }, 10000);
-
-            this.service = new Service.Lightbulb(config.name);
+            this.service = new Service.Lightbulb(this.name);
+            this.lastKnownState = 0; // Speichern Sie den letzten bekannten Zustand
 
             this.service
                 .getCharacteristic(Characteristic.On)
-                .on('get', this.getOn.bind(this))
-                .on('set', this.setOn.bind(this));
+                .on('get', this.getLightState.bind(this));
+
+            this.service
+                .getCharacteristic(Characteristic.On)
+                .on('set', this.setLightState.bind(this));
+
+            // Abrufen des aktuellen Zustands beim Start
+            this.getLightState((err, state) => {
+                if (!err) {
+                    this.service
+                        .getCharacteristic(Characteristic.On)
+                        .updateValue(state);
+                    this.lastKnownState = state;
+                }
+            });
+
+            // Aktualisieren Sie den Zustand alle 5 Sekunden
+            this.statusUpdateInterval = setInterval(() => {
+                this.getLightState((err, state) => {
+                    if (!err && this.lastKnownState !== state) {
+                        this.service
+                            .getCharacteristic(Characteristic.On)
+                            .updateValue(state);
+                        this.lastKnownState = state;
+                    }
+                });
+            }, 5000);
+        }
+
+        getLightState(callback) {
+            getLightStatus(this.ip, this.lightId, this.username, this.password)
+                .then((status) => {
+                    const state = status === 1 ? true : false;
+                    callback(null, state);
+                })
+                .catch((error) => {
+                    this.log('Error getting light status:', error);
+                    callback(error);
+                });
+        }
+
+        setLightState(value, callback) {
+            if (value !== this.lastKnownState) {
+                toggleLight(this.ip, this.lightId, this.username, this.password)
+                    .then(() => {
+                        setTimeout(() => {
+                            this.getLightState((err, newState) => {
+                                if (!err) {
+                                    this.service
+                                        .getCharacteristic(Characteristic.On)
+                                        .updateValue(newState);
+                                    this.lastKnownState = newState;
+                                }
+                            });
+                        }, 1000);
+                        callback(null);
+                    })
+                    .catch((error) => {
+                        this.log('Error setting light state:', error);
+                        callback(error);
+                    });
+            } else {
+                callback(null);
+            }
         }
 
         getServices() {
             return [this.service];
         }
-
-        getOn(callback) {
-            const { ip, lampId, username, password } = this.config;
-
-            getLampStatus(ip, lampId, username, password)
-                .then(status => {
-                    callback(null, status === 'on');
-                })
-                .catch(error => {
-                    callback(error);
-                });
-        }
-
-        setOn(value, callback) {
-            const { ip, lampId, username, password } = this.config;
-
-            toggleLamp(ip, lampId, username, password)
-                .then(() => {
-                    callback(null);
-                })
-                .catch(error => {
-                    callback(error);
-                });
-        }
     }
 
-    homebridge.registerAccessory('homebridge-lamp', 'Lamp2', LampAccessory);
+    homebridge.registerAccessory('homebridge-light', 'LightV1', LightAccessory);
 };
+
