@@ -1,4 +1,4 @@
-const { toggleLight, getLightStatus } = require('./lib/light');
+const { toggleLight, getLightStatus } = require('./light');
 
 module.exports = (homebridge) => {
     const Accessory = homebridge.hap.Accessory;
@@ -92,4 +92,3 @@ module.exports = (homebridge) => {
 
     homebridge.registerAccessory('homebridge-light', 'LightV1', LightAccessory);
 };
-
